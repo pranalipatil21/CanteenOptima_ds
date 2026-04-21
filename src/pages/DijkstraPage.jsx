@@ -37,7 +37,7 @@ export default function DijkstraPage() {
 
   useEffect(() => {
     // Generate states whenever graph or start node changes
-    const { states: newStates, previous } = generateDijkstraStates(nodes, edges, startNode);
+    const { states: newStates, distances, previous } = generateDijkstraStates(nodes, edges, startNode);
     
     // Add path finding logic state at the end
     if (newStates.length > 0 && targetNode) {
@@ -53,7 +53,7 @@ export default function DijkstraPage() {
       if (curr === startNode) {
         newStates.push({
           ...newStates[newStates.length - 1],
-          log: `Found shortest path to ${targetNode}: ${path.reverse().join(' -> ')}`,
+          log: `Found shortest path to ${targetNode}: ${path.reverse().join(' -> ')} (Total Distance: ${distances[targetNode]})`,
           path: path,
           pathEdges: pathEdges,
           isFinished: true

@@ -10,6 +10,16 @@ export function generateFloydWarshallStates(labels, initialMatrix) {
   
   // Deep copy initial matrix
   const dist = initialMatrix.map(row => [...row]);
+  
+  // Matrix to store predecessors for path reconstruction
+  const next = Array(n).fill(0).map(() => Array(n).fill(null));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (initialMatrix[i][j] !== Infinity && i !== j) {
+        next[i][j] = j;
+      }
+    }
+  }
 
   const recordState = (msg, k, i, j, updated = false) => {
     states.push({
@@ -39,6 +49,7 @@ export function generateFloydWarshallStates(labels, initialMatrix) {
         if (dist[i][j] > altDist) {
           const oldDist = dist[i][j] === Infinity ? '∞' : dist[i][j];
           dist[i][j] = altDist;
+          next[i][j] = next[i][k];
           recordState(`Found shorter path ${labels[i]} -> ${labels[j]} through ${labels[k]}. Updated distance from ${oldDist} to ${altDist}.`, k, i, j, true);
         } else {
           recordState(`Checking path ${labels[i]} -> ${labels[k]} -> ${labels[j]} (${altDist}). Existing distance (${dist[i][j]}) is better or equal.`, k, i, j, false);
@@ -49,5 +60,5 @@ export function generateFloydWarshallStates(labels, initialMatrix) {
 
   recordState('Algorithm finished. All pairs shortest paths computed.', null, null, null);
 
-  return states;
+  return { states, dist, next };
 }

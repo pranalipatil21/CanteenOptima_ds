@@ -6,12 +6,13 @@ import { generateFloydWarshallStates } from '../algorithms/floydWarshall';
 import PageHeader from '../components/ui/PageHeader';
 import seatingImg from '../assets/seating.png';
 
-const labels = ['Canteen', 'Lib', 'Hostel', 'Sports'];
+const labels = ['Kitchen', 'Library', 'Hostel', 'Sports', 'Admin'];
 const initialMatrix = [
-  [0, 5, Infinity, 10],
-  [Infinity, 0, 3, Infinity],
-  [Infinity, Infinity, 0, 1],
-  [Infinity, Infinity, Infinity, 0]
+  [0, 4, 2, Infinity, Infinity],
+  [4, 0, Infinity, 3, 5],
+  [2, Infinity, 0, Infinity, 1],
+  [Infinity, 3, Infinity, 0, 2],
+  [Infinity, 5, 1, 2, 0]
 ];
 
 export default function FloydWarshallPage() {
@@ -21,7 +22,27 @@ export default function FloydWarshallPage() {
   const runner = useAlgorithmRunner(states, 500);
 
   useEffect(() => {
-    const generatedStates = generateFloydWarshallStates(labels, initialMatrix);
+    const { states: generatedStates, next, dist } = generateFloydWarshallStates(labels, initialMatrix);
+    
+    // Add path reconstruction for a specific example (Kitchen to Admin) at the end
+    // labels = ['Kitchen', 'Library', 'Hostel', 'Sports', 'Admin']
+    const u = 0; // Kitchen
+    const v = 4; // Admin
+    
+    if (next[u][v] !== null) {
+      let path = [labels[u]];
+      let curr = u;
+      while (curr !== v) {
+        curr = next[curr][v];
+        path.push(labels[curr]);
+      }
+      generatedStates.push({
+        ...generatedStates[generatedStates.length - 1],
+        log: `Found shortest path from ${labels[u]} to ${labels[v]}: ${path.join(' -> ')} (Total Distance: ${dist[u][v]})`,
+        isFinished: true
+      });
+    }
+
     setStates(generatedStates);
     runner.reset();
   }, []);
