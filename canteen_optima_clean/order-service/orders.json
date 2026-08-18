@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "id": "ORD-601097",
+    "customerName": "Anonymous Student",
+    "items": [
+      {
+        "id": "1",
+        "name": "Burger Meals 🍔",
+        "quantity": 1,
+        "price": 120
+      },
+      {
+        "id": "2",
+        "name": "Fries 🍟",
+        "quantity": 1,
+        "price": 90
+      }
+    ],
+    "total": 210,
+    "status": "COMPLETED",
+    "createdAt": "2026-08-18T15:40:01.097Z",
+    "updatedAt": "2026-08-18T15:40:28.863Z"
+  },
+  {
+    "id": "ORD-685859",
+    "customerName": "Anonymous Student",
+    "items": [
+      {
+        "id": "1",
+        "name": "Burger Meals 🍔",
+        "quantity": 1,
+        "price": 120
+      },
+      {
+        "id": "5",
+        "name": "Ice Cream 🍦",
+        "quantity": 1,
+        "price": 60
+      },
+      {
+        "id": "6",
+        "name": "Noodles 🍜",
+        "quantity": 2,
+        "price": 80
+      }
+    ],
+    "total": 340,
+    "status": "COMPLETED",
+    "createdAt": "2026-08-18T15:41:25.859Z",
+    "updatedAt": "2026-08-18T15:41:53.514Z"
+  }
+]

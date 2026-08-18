@@ -165,9 +165,11 @@ const SERVICES_MAP = {
 
 // Generic Proxy Handler with Circuit Breaker
 async function handleProxy(req, res, targetUrl, cbInstance) {
-  const headers = { ...req.headers };
-  delete headers.host;
-  delete headers['accept-encoding'];
+  const headers = {};
+  if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
+  if (req.headers['authorization']) headers['authorization'] = req.headers['authorization'];
+  if (req.headers['x-lamport-clock']) headers['x-lamport-clock'] = req.headers['x-lamport-clock'];
+  if (req.headers['x-vector-clock']) headers['x-vector-clock'] = req.headers['x-vector-clock'];
 
   const config = {
     method: req.method,
