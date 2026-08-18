@@ -52,6 +52,9 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./order-service:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - canteen-network
 
@@ -63,6 +66,9 @@ services:
       - "8002:8002"
     environment:
       - PORT=8002
+    volumes:
+      - ./menu-service:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - canteen-network
 

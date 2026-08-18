@@ -343,7 +343,7 @@ const SERVICES_MAP = {
 async function handleProxy(req, res, targetUrl, cbInstance) {
   const config = {
     method: req.method,
-    url: `${targetUrl}${req.path}`,
+    url: `${targetUrl}${req.url}`,
     data: req.body,
     headers: req.headers,
     timeout: 6000 // 6 seconds timeout
@@ -365,26 +365,26 @@ async function handleProxy(req, res, targetUrl, cbInstance) {
 
 app.all('/api/orders*', (req, res) => {
   // strip /api
-  req.path = req.path.replace(/^\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
   handleProxy(req, res, SERVICES_MAP.order, orderCB);
 });
 
 app.all('/api/menu*', (req, res) => {
-  req.path = req.path.replace(/^\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
   handleProxy(req, res, SERVICES_MAP.menu, menuCB);
 });
 
 app.all('/api/kitchen*', (req, res) => {
-  req.path = req.path.replace(/^\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
   handleProxy(req, res, SERVICES_MAP.kitchen, kitchenCB);
 });
 
 app.all('/api/dist-controller*', (req, res) => {
-  req.path = req.path.replace(/^\/api\/dist-controller/, '');
+  req.url = req.url.replace(/^\/api\/dist-controller/, '');
   // Skip Circuit Breaker for distributed controller status page to allow debugging
   const executeCall = () => axios({
     method: req.method,
-    url: `${SERVICES_MAP.distController}${req.path}`,
+    url: `${SERVICES_MAP.distController}${req.url}`,
     data: req.body,
     timeout: 5000
   });
@@ -394,10 +394,10 @@ app.all('/api/dist-controller*', (req, res) => {
 });
 
 app.all('/api/dfs*', (req, res) => {
-  req.path = req.path.replace(/^\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
   const executeCall = () => axios({
     method: req.method,
-    url: `${SERVICES_MAP.dfs}${req.path}`,
+    url: `${SERVICES_MAP.dfs}${req.url}`,
     data: req.body,
     timeout: 5000
   });
@@ -407,10 +407,10 @@ app.all('/api/dfs*', (req, res) => {
 });
 
 app.all('/api/blockchain*', (req, res) => {
-  req.path = req.path.replace(/^\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
   const executeCall = () => axios({
     method: req.method,
-    url: `${SERVICES_MAP.blockchain}${req.path}`,
+    url: `${SERVICES_MAP.blockchain}${req.url}`,
     data: req.body,
     timeout: 5000
   });
