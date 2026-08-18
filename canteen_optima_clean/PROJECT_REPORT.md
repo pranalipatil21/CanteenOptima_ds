@@ -1,6 +1,5 @@
-# B.Tech Distributed Systems Project Report: Distributed Canteen Optima
-
-This project report outlines the design, architecture, and implementation details of **Distributed Canteen Optima**, a decentralized, service-oriented canteen management application built to showcase practical concepts from the B.Tech Computer Engineering Distributed Systems syllabus.
+# Distributed Canteen Optima - Project Report
+Course: B.Tech Computer Engineering (Distributed Systems Lab)
 
 ---
 
@@ -10,9 +9,9 @@ This project report outlines the design, architecture, and implementation detail
 A distributed system is a collection of independent components located on different machines that communicate and coordinate their actions by passing messages, presenting themselves to the end-user as a single coherent system.
 
 ### Core Goals
-- **Transparency**: Hiding the fact that resources and processes are distributed across multiple backend services (e.g. Access, Location, Migration, and Failure transparency).
-- **Scalability**: Enforcing microservice decoupling so that service components (such as `kitchen-service` or `optimization-service`) can scale independently.
-- **Reliability & Availability**: Incorporating fault tolerance so that failures in individual components (e.g., a cooking replica crashing) do not halt the entire system.
+- **Transparency**: Hiding the fact that resources and processes are distributed across multiple backend services (e.g., Access, Location, Migration, and Failure transparency).
+- **Scalability**: Enforcing microservice decoupling so that service components (such as `order-service` or `kitchen-service`) can scale independently.
+- **Reliability & Availability**: Incorporating fault tolerance so that failures in individual components (e.g., a kitchen node crashing) do not halt the entire system.
 - **Resource Sharing**: Coordinating access to shared resources (like canteen ovens or inventory stock) using distributed locking mechanisms.
 
 ---
@@ -34,11 +33,11 @@ The application adopts a **Microservices / Service-Oriented Architecture (SOA)**
                     └───────────┬────────────┘
                                 │
           ┌─────────────────────┼─────────────────────┐
-          │ (REST)              │ (REST)              │ (gRPC)
+          │ (REST)              │ (REST)              │ (REST)
           ▼                     ▼                     ▼
  ┌────────────────┐    ┌────────────────┐    ┌──────────────────┐
- │ Order Service  │    │  Menu Service  │    │   Optimization   │
- │ [Port 8001]    │    │  [Port 8002]   │    │  [gRPC: 50051]   │
+ │ Order Service  │    │  Menu Service  │    │   Monitoring     │
+ │  [Port 8001]   │    │  [Port 8002]   │    │   [Port 8009]    │
  └────────┬───────┘    └────────────────┘    └──────────────────┘
           │ (Publish: order.created)
           ▼
@@ -55,13 +54,13 @@ The application adopts a **Microservices / Service-Oriented Architecture (SOA)**
 ```
 
 ### Decoupled Backend Nodes
-1. **API Gateway (Port 8000)**: Serves as the single client entry point. Routes REST/gRPC traffic, logs transactions, and manages fault-tolerance policies.
-2. **Order Service (Port 8001)**: Manages placement, cancellation, and updates of orders. Publishes events to RabbitMQ.
+1. **API Gateway (Port 8000)**: Serves as the single client entry point. Routes REST/WebSockets traffic, logs transactions, and manages fault-tolerance policies (Circuit Breakers and Retries).
+2. **Order Service (Port 8001)**: Manages placement and updates of orders. Publishes events to RabbitMQ.
 3. **Menu/Inventory Service (Port 8002)**: Holds item details, pricing, and stock. Protects stock updates using localized **Mutex Locks** to prevent double-spending or overselling.
-4. **Kitchen Service (Port 8003)**: Consumes order events from RabbitMQ and coordinates the preparation pipeline.
+4. **Kitchen Service (Port 8003)**: Consumes order events from RabbitMQ and runs the preparing simulation.
 5. **Notification Service (Port 8004)**: Subscribes to events on RabbitMQ to alert customers on status updates.
-6. **Optimization Service (Port 8005 / gRPC Port 50051)**: Runs complex DAA algorithms (Dijkstra route planning, Job Scheduling kitchen queues, TSP deliveries, Knapsack lunchboxes) and returns step logs.
-7. **Distributed Controller (Port 8006)**: Serves as the synchronization, election, and locking coordinator.
+6. **Distributed Controller (Port 8006)**: Serves as the synchronization, election, and locking coordinator.
+7. **Monitoring Service (Port 8009)**: Collects heartbeat beacons and logs.
 
 ---
 
@@ -70,17 +69,17 @@ The application adopts a **Microservices / Service-Oriented Architecture (SOA)**
 The project demonstrates three distinct paradigms of distributed communication:
 
 ### A. REST (Representational State Transfer)
-- Used for standard CRUD operations (e.g., retrieving menu items or creating orders). REST uses standard HTTP protocols and JSON payloads, which is highly portable but incurs serialization overhead.
+- Used for standard CRUD operations (e.g., retrieving menu items or creating orders). REST uses standard HTTP protocols and JSON payloads, which is highly portable.
+- **Implemented routes**:
+  - `GET /api/menu` / `POST /api/menu` (Admin Stock Management)
+  - `POST /api/orders` (Order Checkout)
+  - `GET /api/kitchen/queue` (Kitchen Monitor)
 
-### B. Remote Procedure Call (gRPC)
-- Implemented between **API Gateway** and **Optimization Service**. gRPC runs over HTTP/2 and utilizes **Protocol Buffers (Proto3)** to serialize data into compact binary payloads.
-- **Why gRPC is useful here**: gRPC provides low-latency, strictly-typed contracts, and bidirectional streaming. This is ideal for computationally intensive tasks like running DAA shortest paths, where fast network execution is critical.
-
-### C. Message-Oriented Middleware (RabbitMQ / AMQP)
+### B. Message-Oriented Middleware (RabbitMQ / AMQP)
 - Enforces loose coupling. When an order is placed, `order-service` publishes a message to the `canteen_events` Exchange. RabbitMQ routes this message to the `kitchen_orders` queue.
 - If the `kitchen-service` crashes, the message remains safely queued on RabbitMQ. When `kitchen-service` recovers, it consumes the pending message, ensuring zero data loss.
 
-### D. Stream-Oriented Communication (WebSockets)
+### C. Stream-Oriented Communication (WebSockets)
 - The **Monitoring Service (Port 8009)** hosts a WebSocket server. The React dashboard establishes a connection to receive real-time streams of heartbeats, event logs, and status updates, avoiding inefficient polling.
 
 ---
@@ -142,15 +141,15 @@ Fault tolerance ensures high availability.
 
 ### A. Beacon Protocol (Heartbeats)
 - Each service instance sends a periodic heartbeat (every 3 seconds) to the monitoring service registry.
-- If pings stop for more than 7 seconds, the registry flags the service as `SUSPECTED_FAILED`.
+- If pings stop for more than 7 seconds, the registry flags the service as `SUSPECTED_FAILED` or `DOWN`.
 
 ### B. Exponential Backoff Retries
-- If a REST/gRPC request to a service fails, the API Gateway retries the request with exponentially increasing delays (e.g. 500ms, then 1000ms, then 2000ms) before returning a failure code.
+- If a REST request to a service fails, the API Gateway retries the request with exponentially increasing delays (e.g., 500ms, then 1000ms, then 2000ms) before returning a failure code.
 
 ### C. Circuit Breakers
 - Implements stateful tracking:
   - **CLOSED**: Traffic flows normally.
-  - **OPEN**: If failures exceed a threshold (e.g. 3), the circuit trips to OPEN. All subsequent requests are blocked immediately, preventing resource exhaustion.
+  - **OPEN**: If failures exceed a threshold (e.g., 3), the circuit trips to OPEN. All subsequent requests are blocked immediately, preventing resource exhaustion.
   - **HALF-OPEN**: After a cooldown period, the gateway sends a single test request. If it succeeds, the circuit closes; if it fails, it returns to OPEN.
 
 ### D. RabbitMQ Dead-Letter Queue (DLQ)
@@ -168,7 +167,7 @@ Fault tolerance ensures high availability.
 
 ### Blockchain Audit Ledger
 - Records order transactions in a cryptographically secure ledger.
-- Each block contains a index, timestamp, transaction payload, previous block hash, and a nonce.
+- Each block contains an index, timestamp, transaction payload, previous block hash, and a nonce.
 - Blocks are mined using Proof of Work (recalculating the hash until it begins with leading zeros).
 - If a transaction value is modified in a database tamper simulation, the hash changes, breaking the link to subsequent blocks. The validation check flags this immediately and identifies the tampered block.
 
@@ -176,8 +175,8 @@ Fault tolerance ensures high availability.
 
 ## 8. Summary of Viva Prep Topics
 
-1. **How is gRPC different from REST?**
-   gRPC uses HTTP/2 (allowing multiplexing, headers compression) and Protocol Buffers, making it faster and strictly typed compared to REST over HTTP/1.1 with text-based JSON.
+1. **How does RabbitMQ enforce loose coupling?**
+   The Order Service publishes messages to an exchange without knowing who processes them. The Kitchen and Notification services subscribe to queues bound to that exchange. If the Kitchen Service is down, messages stay in the queue and are processed when it restarts.
 2. **What is a Lamport Clock?**
    It is a logical clock algorithm that uses monotonically increasing counters to determine the order of events in a distributed system, resolving causal dependencies without physical clocks.
 3. **Explain the Berkeley clock synchronization algorithm.**
