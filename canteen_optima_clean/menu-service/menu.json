@@ -14,7 +14,7 @@
     "price": 90,
     "calories": 350,
     "weight": 1,
-    "stock": 17,
+    "stock": 16,
     "available": true
   },
   {
@@ -23,7 +23,7 @@
     "price": 250,
     "calories": 900,
     "weight": 3,
-    "stock": 4,
+    "stock": 3,
     "available": true
   },
   {
@@ -32,7 +32,7 @@
     "price": 40,
     "calories": 150,
     "weight": 1,
-    "stock": 30,
+    "stock": 29,
     "available": true
   },
   {

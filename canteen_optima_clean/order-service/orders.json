@@ -70,5 +70,33 @@
     "status": "COMPLETED",
     "createdAt": "2026-08-18T15:52:03.595Z",
     "updatedAt": "2026-08-18T15:52:31.117Z"
+  },
+  {
+    "id": "ORD-524990",
+    "customerName": "Anonymous Student",
+    "items": [
+      {
+        "id": "2",
+        "name": "Fries 🍟",
+        "quantity": 1,
+        "price": 90
+      },
+      {
+        "id": "3",
+        "name": "Pizza 🍕",
+        "quantity": 1,
+        "price": 250
+      },
+      {
+        "id": "4",
+        "name": "Cold Drinks 🥤",
+        "quantity": 1,
+        "price": 40
+      }
+    ],
+    "total": 380,
+    "status": "COMPLETED",
+    "createdAt": "2026-08-18T15:55:24.990Z",
+    "updatedAt": "2026-08-18T15:55:52.518Z"
   }
 ]

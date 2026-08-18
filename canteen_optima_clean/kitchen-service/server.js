@@ -35,6 +35,7 @@ async function initRabbitMQ() {
     });
     
     await amqpChannel.bindQueue(queueName, 'canteen_events', 'order.created');
+    await amqpChannel.bindQueue(queueName, 'canteen_events', 'order.status.completed');
     
     // Set prefetch to 1 so we don't grab all orders at once if multiple kitchen instances run
     await amqpChannel.prefetch(1);
@@ -44,26 +45,36 @@ async function initRabbitMQ() {
     amqpChannel.consume(queueName, async (msg) => {
       if (msg !== null) {
         try {
+          const routingKey = msg.fields.routingKey;
           const content = JSON.parse(msg.content.toString());
+          
           // Sync clock
           lamportClock = Math.max(lamportClock, content.lamportClock || 0) + 1;
           
-          console.log(`[Kitchen] Received order: ${content.orderId}, Clock synced: ${lamportClock}`);
-          
-          // Add to kitchen processing list
-          const queueItem = {
-            orderId: content.orderId,
-            items: content.items,
-            total: content.total,
-            status: 'CONFIRMED',
-            receivedAt: new Date().toISOString(),
-            logs: [`Order received in kitchen. Clock: ${lamportClock}`]
-          };
-          
-          kitchenQueue.push(queueItem);
-          
-          // Start simulated cooking workflow
-          processOrderSimulated(queueItem);
+          if (routingKey.endsWith('.completed')) {
+            console.log(`[Kitchen] Order completed/collected by customer: ${content.orderId}`);
+            const index = kitchenQueue.findIndex(q => q.orderId === content.orderId);
+            if (index !== -1) {
+              kitchenQueue.splice(index, 1);
+            }
+          } else if (routingKey === 'order.created') {
+            console.log(`[Kitchen] Received order: ${content.orderId}, Clock synced: ${lamportClock}`);
+            
+            // Add to kitchen processing list
+            const queueItem = {
+              orderId: content.orderId,
+              items: content.items,
+              total: content.total,
+              status: 'CONFIRMED',
+              receivedAt: new Date().toISOString(),
+              logs: [`Order received in kitchen. Clock: ${lamportClock}`]
+            };
+            
+            kitchenQueue.push(queueItem);
+            
+            // Start simulated cooking workflow
+            processOrderSimulated(queueItem);
+          }
           
           // Manually Acknowledge message delivery
           amqpChannel.ack(msg);
@@ -91,6 +102,14 @@ async function initRabbitMQ() {
         };
         kitchenQueue.push(queueItem);
         processOrderSimulated(queueItem);
+      });
+
+      global.mockEventBroker.on('order.status.completed', (event) => {
+        lamportClock = Math.max(lamportClock, event.lamportClock || 0) + 1;
+        const index = kitchenQueue.findIndex(q => q.orderId === event.orderId);
+        if (index !== -1) {
+          kitchenQueue.splice(index, 1);
+        }
       });
     }
   }
@@ -124,15 +143,7 @@ async function processOrderSimulated(item) {
     // Step 3: PREPARING -> READY (after 12 seconds)
     setTimeout(async () => {
       await updateStatus('READY');
-      
-      // Step 4: READY -> COMPLETED (after 10 seconds - order pick up)
-      setTimeout(async () => {
-        await updateStatus('COMPLETED');
-        // Remove from active queue after completion
-        const index = kitchenQueue.findIndex(q => q.orderId === item.orderId);
-        if (index !== -1) kitchenQueue.splice(index, 1);
-      }, 10000);
-
+      // Order is ready! Waits in the active kitchen list until the user completes the checkout collection.
     }, 12000);
 
   }, 8000);

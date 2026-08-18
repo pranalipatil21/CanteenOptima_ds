@@ -59,6 +59,9 @@ class CircuitBreaker {
       this.reset();
       return result;
     } catch (err) {
+      if (err.response && err.response.status < 500) {
+        throw err;
+      }
       this.handleFailure();
       throw err;
     }
@@ -103,6 +106,9 @@ async function retryRequest(fn, retries = 3, delay = 1000) {
   try {
     return await fn();
   } catch (err) {
+    if (err.response && err.response.status < 500) {
+      throw err;
+    }
     if (retries <= 0) throw err;
     logEvent('api-gateway', 'RETRYING_REQUEST', { retriesLeft: retries, waitMs: delay });
     await new Promise(res => setTimeout(res, delay));
