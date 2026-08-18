@@ -1,84 +1,190 @@
-# Canteen Optima: A DAA-Powered Interactive Visualizer
+# B.Tech Distributed Systems Project Report: Distributed Canteen Optima
 
-## 1. Introduction
-**Canteen Optima** is a production-ready, interactive web application built to demonstrate core concepts of the **Design and Analysis of Algorithms (DAA)**. Rather than presenting algorithms in abstract, theoretical terms, this project maps each algorithm to a real-world, highly relatable scenario: **managing a college canteen system.**
+This project report outlines the design, architecture, and implementation details of **Distributed Canteen Optima**, a decentralized, service-oriented canteen management application built to showcase practical concepts from the B.Tech Computer Engineering Distributed Systems syllabus.
 
-The application acts as a live, step-by-step educational tool. Users can input their own data, tweak scenarios, and watch exactly how algorithms execute under the hood, making it the perfect tool for a final-year engineering viva or demonstration.
+---
 
-## 2. Technology Stack
-- **Frontend Framework:** React.js (via Vite)
-- **Styling:** Custom CSS based on the modern "Yummy" template (featuring vibrant colors, distinct typography, and full responsiveness)
-- **Animations:** Framer Motion (for smooth node transitions, table highlights, and sorting visualizers)
-- **State Management:** Custom React Hooks (`useAlgorithmRunner`) for non-blocking playback controls (Play, Pause, Step).
+## 1. Introduction and Design Goals
 
-## 3. How DAA is Applied
-The project implements a variety of algorithmic paradigms to solve specific operational bottlenecks in the canteen:
+### Definition of a Distributed System
+A distributed system is a collection of independent components located on different machines that communicate and coordinate their actions by passing messages, presenting themselves to the end-user as a single coherent system.
 
-### A. Greedy Algorithms
-*Greedy algorithms make the locally optimal choice at each stage with the hope of finding a global optimum.*
+### Core Goals
+- **Transparency**: Hiding the fact that resources and processes are distributed across multiple backend services (e.g. Access, Location, Migration, and Failure transparency).
+- **Scalability**: Enforcing microservice decoupling so that service components (such as `kitchen-service` or `optimization-service`) can scale independently.
+- **Reliability & Availability**: Incorporating fault tolerance so that failures in individual components (e.g., a cooking replica crashing) do not halt the entire system.
+- **Resource Sharing**: Coordinating access to shared resources (like canteen ovens or inventory stock) using distributed locking mechanisms.
 
-**1. Dijkstra's Algorithm (Single Source Shortest Path)**
-- **Problem:** A delivery boy needs to deliver food from the Main Canteen to the Library as fast as possible.
-- **Implementation:** Computes the shortest path using edge weights (representing distance/time).
-- **Time/Space:** $O((V + E) \log V)$ / $O(V)$
+---
 
-**2. Job Scheduling with Deadlines**
-- **Problem:** The kitchen receives multiple orders. Each order yields a specific bill amount (profit) and has a strict preparation deadline (time). We must maximize total revenue.
-- **Implementation:** Sorts jobs by profit in descending order and greedily assigns them to the latest possible free time slot before their deadline.
-- **Time/Space:** $O(N \log N)$ / $O(N)$
+## 2. Microservice & Middleware Architecture
 
-### B. Dynamic Programming (DP)
-*DP solves complex problems by breaking them down into simpler subproblems and storing their solutions.*
+The application adopts a **Microservices / Service-Oriented Architecture (SOA)**, dividing canteen operations into specialized backend nodes:
 
-**3. 0/1 Knapsack Problem**
-- **Problem:** A student has a lunchbox with a strict weight capacity. They want to pack the most satisfying combination of food items (calories) without exceeding the weight limit. You cannot take a fraction of an item (hence 0/1).
-- **Implementation:** Builds a 2D DP matrix to calculate the maximum value for each capacity up to $W$.
-- **Time/Space:** $O(N \times W)$ / $O(N \times W)$
+```
+                    ┌────────────────────────┐
+                    │     Frontend Portal    │
+                    │    React Canteen UI    │
+                    └───────────┬────────────┘
+                                │ (REST / WebSocket)
+                                ▼
+                    ┌────────────────────────┐
+                    │      API Gateway       │
+                    │   [Retries/CB/Routing] │
+                    └───────────┬────────────┘
+                                │
+          ┌─────────────────────┼─────────────────────┐
+          │ (REST)              │ (REST)              │ (gRPC)
+          ▼                     ▼                     ▼
+ ┌────────────────┐    ┌────────────────┐    ┌──────────────────┐
+ │ Order Service  │    │  Menu Service  │    │   Optimization   │
+ │ [Port 8001]    │    │  [Port 8002]   │    │  [gRPC: 50051]   │
+ └────────┬───────┘    └────────────────┘    └──────────────────┘
+          │ (Publish: order.created)
+          ▼
+ ┌──────────────────────────────────────────────────────────────┐
+ │                       RABBITMQ BROKER                        │
+ │                Message-Oriented Middleware                   │
+ └────────┬─────────────────────┬───────────────────────────────┘
+          │ (Subscribe: order.created)
+          ▼                     ▼
+ ┌────────────────┐    ┌────────────────┐
+ │Kitchen Service │    │  Notification  │
+ │  [Port 8003]   │    │  [Port 8004]   │
+ └────────────────┘    └────────────────┘
+```
 
-**4. Floyd-Warshall Algorithm (All-Pairs Shortest Path)**
-- **Problem:** Finding the distance between all pairs of locations on campus (e.g., Hostel to Library, Admin to Sports complex) to optimize future delivery routing.
-- **Implementation:** Uses a 2D distance matrix and updates it iteratively by considering every node as an intermediate point.
-- **Time/Space:** $O(V^3)$ / $O(V^2)$
+### Decoupled Backend Nodes
+1. **API Gateway (Port 8000)**: Serves as the single client entry point. Routes REST/gRPC traffic, logs transactions, and manages fault-tolerance policies.
+2. **Order Service (Port 8001)**: Manages placement, cancellation, and updates of orders. Publishes events to RabbitMQ.
+3. **Menu/Inventory Service (Port 8002)**: Holds item details, pricing, and stock. Protects stock updates using localized **Mutex Locks** to prevent double-spending or overselling.
+4. **Kitchen Service (Port 8003)**: Consumes order events from RabbitMQ and coordinates the preparation pipeline.
+5. **Notification Service (Port 8004)**: Subscribes to events on RabbitMQ to alert customers on status updates.
+6. **Optimization Service (Port 8005 / gRPC Port 50051)**: Runs complex DAA algorithms (Dijkstra route planning, Job Scheduling kitchen queues, TSP deliveries, Knapsack lunchboxes) and returns step logs.
+7. **Distributed Controller (Port 8006)**: Serves as the synchronization, election, and locking coordinator.
 
-### C. Backtracking & Branch and Bound
-*Explores all potential paths, abandoning (pruning) paths that cannot yield a valid or optimal solution.*
+---
 
-**5. Sum of Subsets (Backtracking)**
-- **Problem:** Finding exactly which combination of menu items perfectly matches a specific final bill amount.
-- **Implementation:** Backtracks through the menu array. If the current running sum exceeds the target bill, it prunes the tree and tries a different combination.
-- **Time/Space:** $O(2^N)$ / $O(N)$
+## 3. Communication Architecture
 
-**6. Traveling Salesperson Problem (TSP) (Branch and Bound)**
-- **Problem:** A delivery boy must visit several departments exactly once and return to the canteen, taking the shortest possible overall route.
-- **Implementation:** Uses a state-space tree. It calculates a lower bound cost for paths. If a path's cost exceeds the current best known complete tour, the branch is aggressively pruned.
-- **Time/Space:** $O(V!)$ worst-case / $O(V^2)$ space
+The project demonstrates three distinct paradigms of distributed communication:
 
-**7. Graph Coloring (Backtracking)**
-- **Problem:** Arranging seating in the canteen. Rival groups (conflicting nodes) cannot be seated at the same table (assigned the same color).
-- **Implementation:** Backtracks through the graph, attempting to assign a color from $1$ to $m$. It prunes paths where adjacent nodes share the same color.
-- **Time/Space:** $O(m^V)$ / $O(V)$
+### A. REST (Representational State Transfer)
+- Used for standard CRUD operations (e.g., retrieving menu items or creating orders). REST uses standard HTTP protocols and JSON payloads, which is highly portable but incurs serialization overhead.
 
-### D. Divide & Conquer
-*Breaks a problem into smaller identical subproblems, solves them recursively, and combines their solutions.*
+### B. Remote Procedure Call (gRPC)
+- Implemented between **API Gateway** and **Optimization Service**. gRPC runs over HTTP/2 and utilizes **Protocol Buffers (Proto3)** to serialize data into compact binary payloads.
+- **Why gRPC is useful here**: gRPC provides low-latency, strictly-typed contracts, and bidirectional streaming. This is ideal for computationally intensive tasks like running DAA shortest paths, where fast network execution is critical.
 
-**8. Quick Sort & Merge Sort**
-- **Problem:** Organizing the canteen menu by price from cheapest to most expensive.
-- **Implementation:** 
-  - *Quick Sort* partitions the array around a pivot.
-  - *Merge Sort* halves the array and merges the sorted halves.
-- **Time/Space:** $O(N \log N)$ average time for both. Merge Sort uses $O(N)$ auxiliary space, while Quick Sort is in-place $O(\log N)$.
+### C. Message-Oriented Middleware (RabbitMQ / AMQP)
+- Enforces loose coupling. When an order is placed, `order-service` publishes a message to the `canteen_events` Exchange. RabbitMQ routes this message to the `kitchen_orders` queue.
+- If the `kitchen-service` crashes, the message remains safely queued on RabbitMQ. When `kitchen-service` recovers, it consumes the pending message, ensuring zero data loss.
 
-### E. Search Algorithms
-**9. Binary Search**
-- **Problem:** A staff member needs to quickly find a specific completed order receipt from a chronologically sorted pile of receipts.
-- **Implementation:** Repeatedly halves the search space.
-- **Time/Space:** $O(\log N)$ / $O(1)$
+### D. Stream-Oriented Communication (WebSockets)
+- The **Monitoring Service (Port 8009)** hosts a WebSocket server. The React dashboard establishes a connection to receive real-time streams of heartbeats, event logs, and status updates, avoiding inefficient polling.
 
-## 4. System Architecture (The Execution Engine)
-To make the algorithms interactive, they are NOT written as standard `while` loops that block the browser. 
+---
 
-Instead, they are written as **State Generators**. The algorithm processes the input entirely, pushing a "snapshot" of its state (variables, matrix values, current indices, logs) at every step into an array.
-A custom React hook (`useAlgorithmRunner`) iterates over this array of snapshots on a timer. This design allows users to smoothly Play, Pause, and Step backwards/forwards without freezing the UI.
+## 4. Physical & Logical Clock Synchronization
 
-## 5. Conclusion
-Canteen Optima successfully abstracts complex mathematical algorithms into a relatable business context. It proves that algorithms are not just textbook exercises, but highly practical tools for optimizing resources, time, and revenue in real-world scenarios.
+Synchronization is a fundamental challenge in distributed systems due to independent hardware clocks drifting over time.
+
+### A. Cristian's Algorithm
+- A client synchronizes its clock with a centralized server.
+- The client measures the round-trip time ($RTT = t_{receive} - t_{send}$).
+- It estimates the synchronized time: $T_{sync} = T_{server} + RTT / 2$.
+- The clock offset is calculated as: $Offset = T_{sync} - t_{receive}$.
+
+### B. Berkeley Algorithm
+- Suitable for systems without access to a global UTC source.
+- A coordinator node polls active counters to fetch their local times.
+- The coordinator calculates the average clock difference (excluding outliers).
+- It computes corrections and sends them to each node, adjusting their offsets.
+
+### C. Lamport Logical Clocks
+- Tracks the happened-before relation ($a \to b$).
+- **Rule 1**: Before a local event, increment: $L = L + 1$.
+- **Rule 2**: When sending message $m$, attach timestamp $L_m = L$.
+- **Rule 3**: On receiving message $m$ with timestamp $T$, update: $L = \max(L, T) + 1$.
+- Applied to order workflows (Order Placed $\to$ Kitchen Received $\to$ Notification Sent) to establish causal ordering.
+
+### D. Vector Clocks
+- Establishes precise causal relationships without loss of concurrency details.
+- Maintains a vector $V$ of size $N$ (number of services): `[Order, Kitchen, Notify]`.
+- Messages carry vector stamps, enabling the system to identify if events are causally dependent or concurrent.
+
+---
+
+## 5. Coordinator Elections & Mutual Exclusion
+
+### A. Bully Election Algorithm
+- If a node detects that the coordinator has crashed, it initiates an election.
+- It sends an ELECTION message to all nodes with higher IDs.
+- If no node responds, it elects itself as coordinator and broadcasts a COORDINATOR message.
+- If higher nodes respond, they take over the election, and the highest active node eventually assumes the coordinator role.
+
+### B. Ring Election Algorithm
+- Nodes are arranged in a logical ring.
+- An election token is passed around the ring; each active node appends its ID to the list.
+- When the token returns to the initiator, the node with the highest ID is elected coordinator and broadcasts the result.
+
+### C. Distributed Mutual Exclusion (Oven Lock)
+To prevent conflicting access to a shared resource (such as a Premium Oven), the system supports three locking modes:
+1. **Centralized**: A coordinator grants lock access and maintains a FIFO wait queue.
+2. **Ricart-Agrawala**: A node broadcasts a request with a Lamport timestamp. Other nodes reply with an OK message. The requesting node enters the critical section only after receiving approvals from all active nodes.
+3. **Token Ring**: A token circulates around a logical ring. A node can enter the critical section only when it holds the token.
+
+---
+
+## 6. Fault Tolerance & Heartbeats
+
+Fault tolerance ensures high availability.
+
+### A. Beacon Protocol (Heartbeats)
+- Each service instance sends a periodic heartbeat (every 3 seconds) to the monitoring service registry.
+- If pings stop for more than 7 seconds, the registry flags the service as `SUSPECTED_FAILED`.
+
+### B. Exponential Backoff Retries
+- If a REST/gRPC request to a service fails, the API Gateway retries the request with exponentially increasing delays (e.g. 500ms, then 1000ms, then 2000ms) before returning a failure code.
+
+### C. Circuit Breakers
+- Implements stateful tracking:
+  - **CLOSED**: Traffic flows normally.
+  - **OPEN**: If failures exceed a threshold (e.g. 3), the circuit trips to OPEN. All subsequent requests are blocked immediately, preventing resource exhaustion.
+  - **HALF-OPEN**: After a cooldown period, the gateway sends a single test request. If it succeeds, the circuit closes; if it fails, it returns to OPEN.
+
+### D. RabbitMQ Dead-Letter Queue (DLQ)
+- Messages that fail processing or exceed retry limits in the Kitchen Queue are routed to the DLQ (`canteen_dlx` exchange) for auditing.
+
+---
+
+## 7. Distributed File System & Blockchain Ledger
+
+### HDFS Replication Simulation
+- Demonstrates distributed file storage.
+- When a file is uploaded, the simulated NameNode splits the file into blocks.
+- Each block is replicated to 2 random active DataNodes (Replication Factor = 2).
+- If a DataNode crashes, the NameNode detects the failure and automatically triggers re-replication of the lost blocks to the remaining active DataNodes, restoring the replication factor.
+
+### Blockchain Audit Ledger
+- Records order transactions in a cryptographically secure ledger.
+- Each block contains a index, timestamp, transaction payload, previous block hash, and a nonce.
+- Blocks are mined using Proof of Work (recalculating the hash until it begins with leading zeros).
+- If a transaction value is modified in a database tamper simulation, the hash changes, breaking the link to subsequent blocks. The validation check flags this immediately and identifies the tampered block.
+
+---
+
+## 8. Summary of Viva Prep Topics
+
+1. **How is gRPC different from REST?**
+   gRPC uses HTTP/2 (allowing multiplexing, headers compression) and Protocol Buffers, making it faster and strictly typed compared to REST over HTTP/1.1 with text-based JSON.
+2. **What is a Lamport Clock?**
+   It is a logical clock algorithm that uses monotonically increasing counters to determine the order of events in a distributed system, resolving causal dependencies without physical clocks.
+3. **Explain the Berkeley clock synchronization algorithm.**
+   It is an active synchronization method where a coordinator polls nodes for their times, averages the offsets, and tells each node how much to adjust its local clock.
+4. **What does a Circuit Breaker do?**
+   It prevents a cascading failure by stopping requests to an already failing service, giving it time to recover.
+5. **How does the HDFS replication work in your project?**
+   Files are split into blocks and written to two different DataNodes. If a DataNode crashes, the NameNode detects this via lost heartbeats and re-replicates those blocks to a healthy node.
+6. **How does the blockchain detect tampered data?**
+   Each block holds the hash of the previous block. If a block's data is modified, its hash changes, which invalidates all subsequent blocks in the chain.

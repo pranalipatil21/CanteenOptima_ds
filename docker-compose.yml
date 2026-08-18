@@ -1,0 +1,173 @@
+version: '3.8'
+
+services:
+  # Message Broker Middleware
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: canteen-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - canteen-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: canteen-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - OPTIMIZATION_GRPC_ADDR=optimization-service:50051
+      - ORDER_SERVICE_URL=http://order-service:8001
+      - MENU_SERVICE_URL=http://menu-service:8002
+      - KITCHEN_SERVICE_URL=http://kitchen-service:8003
+      - DIST_CONTROLLER_URL=http://distributed-controller:8006
+      - DFS_SERVICE_URL=http://dfs-service:8007
+      - BLOCKCHAIN_SERVICE_URL=http://blockchain-service:8008
+      - MONITORING_SERVICE_URL=http://monitoring-service:8009
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      optimization-service:
+        condition: service_started
+    networks:
+      - canteen-network
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    container_name: canteen-order-service
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - canteen-network
+
+  # Menu/Inventory Service
+  menu-service:
+    build: ./menu-service
+    container_name: canteen-menu-service
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+    networks:
+      - canteen-network
+
+  # Kitchen Service
+  kitchen-service:
+    build: ./kitchen-service
+    container_name: canteen-kitchen-service
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - ORDER_SERVICE_URL=http://order-service:8001
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - canteen-network
+
+  # Notification Service
+  notification-service:
+    build: ./notification-service
+    container_name: canteen-notification-service
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - canteen-network
+
+  # Optimization Service (REST / gRPC)
+  optimization-service:
+    build: ./optimization-service
+    container_name: canteen-optimization-service
+    ports:
+      - "8005:8005"
+      - "50051:50051"
+    environment:
+      - REST_PORT=8005
+      - GRPC_PORT=50051
+    networks:
+      - canteen-network
+
+  # Distributed Clocks, Elections & Mutex Controller
+  distributed-controller:
+    build: ./distributed-controller
+    container_name: canteen-dist-controller
+    ports:
+      - "8006:8006"
+    environment:
+      - PORT=8006
+    networks:
+      - canteen-network
+
+  # HDFS DFS Simulation Service
+  dfs-service:
+    build: ./dfs-service
+    container_name: canteen-dfs-service
+    ports:
+      - "8007:8007"
+    environment:
+      - PORT=8007
+    networks:
+      - canteen-network
+
+  # Blockchain Audit Ledger
+  blockchain-service:
+    build: ./blockchain-service
+    container_name: canteen-blockchain-service
+    ports:
+      - "8008:8008"
+    environment:
+      - PORT=8008
+    networks:
+      - canteen-network
+
+  # Central WS Broadcaster & Service Registry
+  monitoring-service:
+    build: ./monitoring-service
+    container_name: canteen-monitoring-service
+    ports:
+      - "8009:8009"
+    environment:
+      - PORT=8009
+    networks:
+      - canteen-network
+
+  # Frontend Static Server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: canteen-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - canteen-network
+
+networks:
+  canteen-network:
+    name: canteen_optima_net
+    driver: bridge
