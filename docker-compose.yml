@@ -24,7 +24,6 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
-      - OPTIMIZATION_GRPC_ADDR=optimization-service:50051
       - ORDER_SERVICE_URL=http://order-service:8001
       - MENU_SERVICE_URL=http://menu-service:8002
       - KITCHEN_SERVICE_URL=http://kitchen-service:8003
@@ -35,8 +34,6 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      optimization-service:
-        condition: service_started
     networks:
       - canteen-network
 
@@ -103,18 +100,6 @@ services:
     networks:
       - canteen-network
 
-  # Optimization Service (REST / gRPC)
-  optimization-service:
-    build: ./optimization-service
-    container_name: canteen-optimization-service
-    ports:
-      - "8005:8005"
-      - "50051:50051"
-    environment:
-      - REST_PORT=8005
-      - GRPC_PORT=50051
-    networks:
-      - canteen-network
 
   # Distributed Clocks, Elections & Mutex Controller
   distributed-controller:

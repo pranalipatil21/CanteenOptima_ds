@@ -1,8 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import grpc from '@grpc/grpc-js';
-import protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,8 +8,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8000;
-const OPTIMIZATION_GRPC_ADDR = process.env.OPTIMIZATION_GRPC_ADDR || 'localhost:50051';
-const PROTO_PATH = path.resolve(__dirname, 'protos/optimization.proto');
 const INSTANCE_ID = process.env.INSTANCE_ID || 'api-gateway-01';
 const startTime = Date.now();
 
@@ -98,7 +94,6 @@ class CircuitBreaker {
   }
 }
 
-const optimizationCB = new CircuitBreaker('optimization-service');
 const orderCB = new CircuitBreaker('order-service');
 const menuCB = new CircuitBreaker('menu-service');
 const kitchenCB = new CircuitBreaker('kitchen-service');
@@ -115,22 +110,7 @@ async function retryRequest(fn, retries = 3, delay = 1000) {
   }
 }
 
-// Load Proto & Setup gRPC Client
-let grpcClient = null;
-try {
-  const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: true,
-    longs: String,
-    enums: String,
-    defaults: true,
-    oneofs: true
-  });
-  const optimizationProto = grpc.loadPackageDefinition(packageDefinition).optimization;
-  grpcClient = new optimizationProto.OptimizationService(OPTIMIZATION_GRPC_ADDR, grpc.credentials.createInsecure());
-  console.log(`[gRPC Client] Connected to Optimization Service at ${OPTIMIZATION_GRPC_ADDR}`);
-} catch (e) {
-  console.error(`[gRPC Client] Failed to load grpc: ${e.message}`);
-}
+// Initialize Express Gateway App
 
 const app = express();
 app.use(cors());
@@ -158,7 +138,6 @@ app.get('/api/gateway/status', (req, res) => {
   res.json({
     lamportClock,
     circuitBreakers: {
-      optimization: optimizationCB.getStatus(),
       order: orderCB.getStatus(),
       menu: menuCB.getStatus(),
       kitchen: kitchenCB.getStatus()
@@ -172,160 +151,6 @@ app.get('/api/gateway/clock', (req, res) => {
   res.json({
     serverTime: Date.now()
   });
-});
-
-// API Gateway routes to Optimization Service (using gRPC by default)
-app.post('/api/optimization/dijkstra', async (req, res) => {
-  const runDijkstraGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      
-      const payload = {
-        startNode: req.body.startNode || 'Kitchen',
-        targetNode: req.body.targetNode || '',
-        nodesJson: JSON.stringify(req.body.nodes),
-        edgesJson: JSON.stringify(req.body.edges)
-      };
-
-      // Set a timeout of 5 seconds
-      const deadline = new Date(Date.now() + 5000);
-      grpcClient.RunDijkstra(payload, { deadline }, (err, response) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(JSON.parse(response.resultJson));
-        }
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runDijkstraGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    logEvent('api-gateway', 'ROUTE_FAILED', { path: '/api/optimization/dijkstra', error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/optimization/floyd-warshall', async (req, res) => {
-  const runFWGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      const payload = {
-        nodesJson: JSON.stringify(req.body.nodes),
-        edgesJson: JSON.stringify(req.body.edges)
-      };
-      const deadline = new Date(Date.now() + 5000);
-      grpcClient.RunFloydWarshall(payload, { deadline }, (err, response) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(response.resultJson));
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runFWGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/optimization/tsp', async (req, res) => {
-  const runTSPGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      const payload = {
-        nodesJson: JSON.stringify(req.body.nodes),
-        edgesJson: JSON.stringify(req.body.edges)
-      };
-      const deadline = new Date(Date.now() + 8000);
-      grpcClient.RunTSP(payload, { deadline }, (err, response) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(response.resultJson));
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runTSPGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/optimization/job-scheduling', async (req, res) => {
-  const runJSGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      const payload = {
-        jobsJson: JSON.stringify(req.body.jobs)
-      };
-      const deadline = new Date(Date.now() + 5000);
-      grpcClient.RunJobScheduling(payload, { deadline }, (err, response) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(response.resultJson));
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runJSGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/optimization/knapsack', async (req, res) => {
-  const runKnapsackGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      const payload = {
-        capacity: req.body.capacity,
-        itemsJson: JSON.stringify(req.body.items)
-      };
-      const deadline = new Date(Date.now() + 5000);
-      grpcClient.RunKnapsack(payload, { deadline }, (err, response) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(response.resultJson));
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runKnapsackGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/optimization/graph-coloring', async (req, res) => {
-  const runColoringGrpc = () => {
-    return new Promise((resolve, reject) => {
-      if (!grpcClient) return reject(new Error('gRPC client not initialized'));
-      const payload = {
-        nodesJson: JSON.stringify(req.body.nodes),
-        edgesJson: JSON.stringify(req.body.edges),
-        m: req.body.m
-      };
-      const deadline = new Date(Date.now() + 5000);
-      grpcClient.RunGraphColoring(payload, { deadline }, (err, response) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(response.resultJson));
-      });
-    });
-  };
-
-  try {
-    const states = await optimizationCB.execute(() => retryRequest(runColoringGrpc, 2, 500));
-    res.json({ states });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // Proxy routes for other services (to be added)

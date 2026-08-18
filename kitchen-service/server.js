@@ -191,6 +191,30 @@ app.get('/kitchen/queue', (req, res) => {
   res.json(kitchenQueue);
 });
 
+app.post('/kitchen/update-status', async (req, res) => {
+  const { orderId, status } = req.body;
+  const item = kitchenQueue.find(q => q.orderId === orderId);
+  
+  if (item) {
+    item.status = status;
+    item.logs.push(`Manual status override: ${status} at ${new Date().toLocaleTimeString()}`);
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+      const index = kitchenQueue.findIndex(q => q.orderId === orderId);
+      if (index !== -1) kitchenQueue.splice(index, 1);
+    }
+  }
+
+  try {
+    const orderSvcUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:8001';
+    await axios.put(`${orderSvcUrl}/orders/${orderId}`, { status });
+  } catch (err) {
+    console.error(`[Kitchen] Manual status sync failed: ${err.message}`);
+  }
+
+  publishStatusEvent(orderId, status);
+  res.json({ status: 'OK', queue: kitchenQueue });
+});
+
 app.listen(PORT, async () => {
   console.log(`[REST] Kitchen Service running on port ${PORT}`);
   await initRabbitMQ();

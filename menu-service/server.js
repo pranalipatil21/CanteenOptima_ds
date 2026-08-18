@@ -186,6 +186,75 @@ app.post('/menu/replenish', async (req, res) => {
   }
 });
 
+// Add new Menu Item (admin)
+app.post('/menu', async (req, res) => {
+  const { name, price, calories, weight, stock, category } = req.body;
+  if (!name || !price) {
+    return res.status(400).json({ error: 'Name and price are required' });
+  }
+
+  const menu = readMenu();
+  const newItem = {
+    id: String(Date.now()),
+    name,
+    price: Number(price),
+    calories: Number(calories || 0),
+    weight: Number(weight || 0),
+    stock: Number(stock || 0),
+    category: category || 'General'
+  };
+
+  menu.push(newItem);
+  writeMenu(menu);
+  res.status(201).json(newItem);
+});
+
+// Update Menu Item (admin)
+app.put('/menu/:id', async (req, res) => {
+  const itemId = req.params.id;
+  const lock = getLock(itemId);
+  await lock.acquire();
+
+  try {
+    const menu = readMenu();
+    const itemIndex = menu.findIndex(m => m.id === itemId);
+    if (itemIndex === -1) return res.status(404).json({ error: 'Item not found' });
+
+    const updated = {
+      ...menu[itemIndex],
+      ...req.body,
+      id: itemId
+    };
+
+    if (updated.price !== undefined) updated.price = Number(updated.price);
+    if (updated.stock !== undefined) updated.stock = Number(updated.stock);
+    if (updated.calories !== undefined) updated.calories = Number(updated.calories);
+    if (updated.weight !== undefined) updated.weight = Number(updated.weight);
+
+    menu[itemIndex] = updated;
+    writeMenu(menu);
+    res.json(updated);
+  } finally {
+    lock.release();
+  }
+});
+
+// Delete Menu Item (admin)
+app.delete('/menu/:id', async (req, res) => {
+  const itemId = req.params.id;
+  const lock = getLock(itemId);
+  await lock.acquire();
+
+  try {
+    const menu = readMenu();
+    const filtered = menu.filter(m => m.id !== itemId);
+    writeMenu(filtered);
+    res.json({ message: `Item ${itemId} deleted successfully` });
+  } finally {
+    lock.release();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`[REST] Menu/Inventory Service running on port ${PORT}`);
 

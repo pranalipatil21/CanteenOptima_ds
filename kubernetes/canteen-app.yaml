@@ -5,7 +5,6 @@ metadata:
   namespace: default
 data:
   RABBITMQ_URL: "amqp://rabbitmq-service:5672"
-  OPTIMIZATION_GRPC_ADDR: "optimization-service:50051"
   ORDER_SERVICE_URL: "http://order-service:8001"
   MENU_SERVICE_URL: "http://menu-service:8002"
   KITCHEN_SERVICE_URL: "http://kitchen-service:8003"
@@ -56,52 +55,7 @@ spec:
     targetPort: 15672
 
 ---
-# 2. Optimization Service (REST & gRPC)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: optimization-deployment
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: optimization-service
-  template:
-    metadata:
-      labels:
-        app: optimization-service
-    spec:
-      containers:
-      - name: optimization-service
-        image: canteen-optimization-service:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8005
-        - containerPort: 50051
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8005
-          initialDelaySeconds: 15
-          periodSeconds: 10
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: optimization-service
-spec:
-  selector:
-    app: optimization-service
-  ports:
-  - name: rest
-    port: 8005
-    targetPort: 8005
-  - name: grpc
-    port: 50051
-    targetPort: 50051
-
----
 # 3. Kitchen Service (3 Replicas to show Scaling / Load Balancing)
 apiVersion: apps/v1
 kind: Deployment
