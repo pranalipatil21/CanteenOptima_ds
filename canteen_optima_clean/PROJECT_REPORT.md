@@ -1,4 +1,4 @@
-# Distributed Canteen Optima - Project Report
+# Distributed Canteen Optima: A Microservice-Based Distributed Canteen Management and Fault-Tolerant System
 Course: B.Tech Computer Engineering (Distributed Systems Lab)
 
 ---
@@ -18,8 +18,33 @@ A distributed system is a collection of independent components located on differ
 
 ## 2. Microservice & Middleware Architecture
 
-The application adopts a **Microservices / Service-Oriented Architecture (SOA)**, dividing canteen operations into specialized backend nodes:
+The application adopts a **Microservices / Service-Oriented Architecture (SOA)**, dividing canteen operations into specialized backend nodes.
 
+### Logical Hierarchy:
+```text
+Frontend
+    │
+    ▼
+API Gateway
+    │
+┌──────────┬──────────┬──────────┬──────────────┐
+│  Menu    │  Order   │ Kitchen  │ Notification │
+│ Service  │ Service  │ Service  │ Service      │
+└──────────┴─────┬────┴──────────┴──────────────┘
+                 │
+              RabbitMQ
+                 │
+            Monitoring
+                 │
+      Distributed Controller
+                 │
+       ┌─────────┼─────────┐
+       ▼         ▼         ▼
+    Clocks    Election    DFS
+                         Blockchain
+```
+
+### Network Topology:
 ```
                     ┌────────────────────────┐
                     │     Frontend Portal    │
