@@ -9,6 +9,7 @@ data:
   MENU_SERVICE_URL: "http://menu-service:8002"
   KITCHEN_SERVICE_URL: "http://kitchen-service:8003"
   MONITORING_SERVICE_URL: "http://monitoring-service:8009"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8004"
 
 ---
 # 1. RabbitMQ Broker

@@ -52,12 +52,12 @@ function getLock(itemId) {
 
 // Initial Menu Data
 const DEFAULT_MENU = [
-  { id: '1', name: 'Burger Meals 🍔', price: 120, calories: 600, weight: 2, stock: 10 },
-  { id: '2', name: 'Fries 🍟', price: 90, calories: 350, weight: 1, stock: 20 },
-  { id: '3', name: 'Pizza 🍕', price: 250, calories: 900, weight: 3, stock: 5 },
-  { id: '4', name: 'Cold Drinks 🥤', price: 40, calories: 150, weight: 1, stock: 30 },
-  { id: '5', name: 'Ice Cream 🍦', price: 60, calories: 200, weight: 1, stock: 25 },
-  { id: '6', name: 'Noodles 🍜', price: 80, calories: 400, weight: 1, stock: 15 }
+  { id: '1', name: 'Burger Meals 🍔', price: 120, calories: 600, weight: 2, stock: 10, available: true },
+  { id: '2', name: 'Fries 🍟', price: 90, calories: 350, weight: 1, stock: 20, available: true },
+  { id: '3', name: 'Pizza 🍕', price: 250, calories: 900, weight: 3, stock: 5, available: true },
+  { id: '4', name: 'Cold Drinks 🥤', price: 40, calories: 150, weight: 1, stock: 30, available: true },
+  { id: '5', name: 'Ice Cream 🍦', price: 60, calories: 200, weight: 1, stock: 25, available: true },
+  { id: '6', name: 'Noodles 🍜', price: 80, calories: 400, weight: 1, stock: 15, available: true }
 ];
 
 // Initialize db file
@@ -184,6 +184,58 @@ app.post('/menu/replenish', async (req, res) => {
   } finally {
     lock.release();
   }
+});
+
+// Add Menu Item
+app.post('/menu', (req, res) => {
+  const { name, price, category, stock, available } = req.body;
+  if (!name || price === undefined || stock === undefined) {
+    return res.status(400).json({ error: 'Missing name, price, or stock parameter' });
+  }
+  const currentMenu = readMenu();
+  const newItem = {
+    id: Date.now().toString(),
+    name,
+    price: Number(price),
+    category: category || 'Snacks',
+    stock: Number(stock),
+    available: available !== undefined ? !!available : true,
+    calories: 200,
+    weight: 1
+  };
+  currentMenu.push(newItem);
+  writeMenu(currentMenu);
+  res.status(201).json(newItem);
+});
+
+// Update Menu Item
+app.put('/menu/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, price, category, stock, available } = req.body;
+  const currentMenu = readMenu();
+  const dbItem = currentMenu.find(m => m.id === id);
+  if (!dbItem) return res.status(404).json({ error: 'Item not found' });
+
+  if (name !== undefined) dbItem.name = name;
+  if (price !== undefined) dbItem.price = Number(price);
+  if (category !== undefined) dbItem.category = category;
+  if (stock !== undefined) dbItem.stock = Number(stock);
+  if (available !== undefined) dbItem.available = !!available;
+
+  writeMenu(currentMenu);
+  res.json(dbItem);
+});
+
+// Delete Menu Item
+app.delete('/menu/:id', (req, res) => {
+  const { id } = req.params;
+  let currentMenu = readMenu();
+  const exists = currentMenu.some(m => m.id === id);
+  if (!exists) return res.status(404).json({ error: 'Item not found' });
+
+  currentMenu = currentMenu.filter(m => m.id !== id);
+  writeMenu(currentMenu);
+  res.json({ message: 'Item deleted successfully' });
 });
 
 app.listen(PORT, () => {

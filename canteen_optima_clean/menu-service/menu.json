@@ -5,7 +5,8 @@
     "price": 120,
     "calories": 600,
     "weight": 2,
-    "stock": 10
+    "stock": 10,
+    "available": true
   },
   {
     "id": "2",
@@ -13,7 +14,8 @@
     "price": 90,
     "calories": 350,
     "weight": 1,
-    "stock": 20
+    "stock": 20,
+    "available": true
   },
   {
     "id": "3",
@@ -21,7 +23,8 @@
     "price": 250,
     "calories": 900,
     "weight": 3,
-    "stock": 5
+    "stock": 5,
+    "available": true
   },
   {
     "id": "4",
@@ -29,7 +32,8 @@
     "price": 40,
     "calories": 150,
     "weight": 1,
-    "stock": 30
+    "stock": 30,
+    "available": true
   },
   {
     "id": "5",
@@ -37,7 +41,8 @@
     "price": 60,
     "calories": 200,
     "weight": 1,
-    "stock": 25
+    "stock": 25,
+    "available": true
   },
   {
     "id": "6",
@@ -45,6 +50,7 @@
     "price": 80,
     "calories": 400,
     "weight": 1,
-    "stock": 15
+    "stock": 15,
+    "available": true
   }
 ]

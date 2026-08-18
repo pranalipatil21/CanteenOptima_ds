@@ -31,6 +31,7 @@ services:
       - DFS_SERVICE_URL=http://dfs-service:8007
       - BLOCKCHAIN_SERVICE_URL=http://blockchain-service:8008
       - MONITORING_SERVICE_URL=http://monitoring-service:8009
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8004
     depends_on:
       rabbitmq:
         condition: service_healthy

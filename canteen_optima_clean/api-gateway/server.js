@@ -165,11 +165,15 @@ const SERVICES_MAP = {
 
 // Generic Proxy Handler with Circuit Breaker
 async function handleProxy(req, res, targetUrl, cbInstance) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers['accept-encoding'];
+
   const config = {
     method: req.method,
     url: `${targetUrl}${req.url}`,
     data: req.body,
-    headers: req.headers,
+    headers,
     timeout: 6000 // 6 seconds timeout
   };
 
