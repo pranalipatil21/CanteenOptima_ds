@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package optimization;
+
+service OptimizationService {
+  rpc RunDijkstra (DijkstraRequest) returns (AlgorithmResponse);
+  rpc RunFloydWarshall (FloydWarshallRequest) returns (AlgorithmResponse);
+  rpc RunTSP (TSPRequest) returns (AlgorithmResponse);
+  rpc RunJobScheduling (JobSchedulingRequest) returns (AlgorithmResponse);
+  rpc RunKnapsack (KnapsackRequest) returns (AlgorithmResponse);
+  rpc RunGraphColoring (GraphColoringRequest) returns (AlgorithmResponse);
+}
+
+message DijkstraRequest {
+  string startNode = 1;
+  string targetNode = 2;
+  string nodesJson = 3;
+  string edgesJson = 4;
+}
+
+message FloydWarshallRequest {
+  string nodesJson = 1;
+  string edgesJson = 2;
+}
+
+message TSPRequest {
+  string nodesJson = 1;
+  string edgesJson = 2;
+}
+
+message JobSchedulingRequest {
+  string jobsJson = 1;
+}
+
+message KnapsackRequest {
+  int32 capacity = 1;
+  string itemsJson = 2;
+}
+
+message GraphColoringRequest {
+  string nodesJson = 1;
+  string edgesJson = 2;
+  int32 m = 3;
+}
+
+message AlgorithmResponse {
+  string resultJson = 1; // JSON-serialized state array for frontend visualization
+}
