@@ -11,6 +11,7 @@ export default function Home() {
   const [cart, setCart] = useState({});
   const [placingOrder, setPlacingOrder] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState(null);
+  const [orders, setOrders] = useState([]);
 
   // Fetch Menu from API Gateway
   const fetchMenu = async () => {
@@ -28,8 +29,39 @@ export default function Home() {
     }
   };
 
+  // Fetch Orders from API Gateway
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/orders');
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      const data = await res.json();
+      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(data);
+    } catch (err) {
+      console.error("Failed to fetch orders:", err.message);
+    }
+  };
+
+  // Collect/Pick Up Order (Checkout)
+  const collectOrder = async (orderId) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'COMPLETED' })
+      });
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      fetchOrders();
+    } catch (err) {
+      alert(`Failed to collect order: ${err.message}`);
+    }
+  };
+
   useEffect(() => {
     fetchMenu();
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Cart operations
@@ -111,6 +143,7 @@ export default function Home() {
       setPlacedOrderId(orderData.id);
       clearCart();
       fetchMenu(); // Refresh stock in visual list
+      fetchOrders(); // Refresh orders list
     } catch (err) {
       alert(`Order placement failed: ${err.message}`);
     } finally {
@@ -271,6 +304,97 @@ export default function Home() {
             )}
           </div>
           
+        </div>
+      )}
+
+      {/* Active Orders Tracker & Collection Panel */}
+      {!loading && (
+        <div style={{ marginTop: '3rem', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
+          <h3 style={{ fontSize: '1.4rem', marginBottom: '1.5rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+            <CheckCircle size={22} color="#38A169" /> Active Orders & Collection Dashboard
+          </h3>
+          {orders.length === 0 ? (
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+              No orders placed yet. Add items to your cart and place an order to track it here.
+            </p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {orders.slice(0, 6).map(order => (
+                <div key={order.id} className="card" style={{
+                  border: order.status === 'READY' ? '2px dashed #38A169' : '1px solid var(--border-color)',
+                  backgroundColor: order.status === 'COMPLETED' ? 'rgba(56, 161, 105, 0.03)' : 'var(--bg-card)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: '1.25rem'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '1rem', color: 'var(--accent-orange)' }}>{order.id}</span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '0.125rem 0.5rem',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        backgroundColor: 
+                          order.status === 'READY' ? '#38A169' :
+                          order.status === 'COMPLETED' ? 'var(--bg-sidebar)' :
+                          order.status === 'PREPARING' ? 'var(--accent-orange)' :
+                          order.status === 'CONFIRMED' ? 'var(--accent-red)' : '#718096',
+                        color: order.status === 'COMPLETED' ? 'var(--text-muted)' : '#fff'
+                      }}>
+                        {order.status}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+                      <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Items Ordered:</strong>
+                      <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                        {order.items.map((item, idx) => (
+                          <li key={idx} style={{ color: 'var(--text-main)' }}>
+                            {item.name} × {item.quantity}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Total Bill:</span>
+                      <strong style={{ fontSize: '1.1rem', color: 'var(--text-main)' }}>₹{order.total}</strong>
+                    </div>
+                    
+                    {order.status === 'READY' ? (
+                      <button 
+                        className="btn btn-primary"
+                        style={{ 
+                          backgroundColor: '#38A169', 
+                          borderColor: '#38A169', 
+                          padding: '0.4rem 0.8rem', 
+                          fontSize: '0.8rem',
+                          color: '#fff',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => collectOrder(order.id)}
+                      >
+                        Collect & Checkout
+                      </button>
+                    ) : order.status === 'COMPLETED' ? (
+                      <span style={{ color: '#38A169', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <CheckCircle size={16} /> Collected & Paid
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {order.status === 'PLACED' ? 'Waiting in Queue' : order.status === 'CONFIRMED' ? 'Confirmed' : 'Cooking in Oven...'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
