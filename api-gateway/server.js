@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8000;
 const OPTIMIZATION_GRPC_ADDR = process.env.OPTIMIZATION_GRPC_ADDR || 'localhost:50051';
-const PROTO_PATH = path.resolve(__dirname, '../protos/optimization.proto');
+const PROTO_PATH = path.resolve(__dirname, 'protos/optimization.proto');
 const INSTANCE_ID = process.env.INSTANCE_ID || 'api-gateway-01';
 const startTime = Date.now();
 
@@ -380,7 +380,7 @@ app.all('/api/kitchen*', (req, res) => {
 });
 
 app.all('/api/dist-controller*', (req, res) => {
-  req.path = req.path.replace(/^\/api/, '');
+  req.path = req.path.replace(/^\/api\/dist-controller/, '');
   // Skip Circuit Breaker for distributed controller status page to allow debugging
   const executeCall = () => axios({
     method: req.method,

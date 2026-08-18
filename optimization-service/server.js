@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Paths & Ports
-const PROTO_PATH = path.resolve(__dirname, '../protos/optimization.proto');
+const PROTO_PATH = path.resolve(__dirname, 'protos/optimization.proto');
 const GRPC_PORT = process.env.GRPC_PORT || 50051;
 const REST_PORT = process.env.REST_PORT || 8005;
 const INSTANCE_ID = process.env.INSTANCE_ID || 'optimization-service-01';
